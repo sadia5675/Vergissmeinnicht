@@ -8,6 +8,22 @@
 import SwiftUI
 import CoreData
 
+
+struct ContentView: View {
+    var body: some View {
+        GardenView()
+            .onAppear {
+            ImageService.shared.seedIfNeeded()
+                MomentService.shared.seedInteractionTypesIfNeeded()
+            }
+    }
+}
+
+#Preview {
+    GardenView()
+}
+
+/*
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -86,3 +102,4 @@ private let itemFormatter: DateFormatter = {
 #Preview {
     ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }
+*/
