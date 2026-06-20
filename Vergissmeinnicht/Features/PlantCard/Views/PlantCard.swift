@@ -19,13 +19,31 @@ struct PlantCard: View {
         MotionManager.shared
 
     private var currentStage: Int {
-        plantStageService.calculateStage(
-            for: relationship
-        )
+
+        let count =
+            plantStageService.currentMomentCount(
+                for: relationship
+            )
+
+        let stage =
+            plantStageService.stage(
+                for: count
+            )
+
+        print("Count:", count)
+        print("Stage:", stage)
+
+        return stage
     }
 
     private var plantImage: UIImage? {
-        imageService.getPlantImage(
+
+        print(
+            "Bild wird geladen mit Stage:",
+            currentStage
+        )
+
+        return imageService.getPlantImage(
             name: relationship.plant.type,
             stage: currentStage
         )

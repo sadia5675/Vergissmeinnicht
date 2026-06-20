@@ -35,9 +35,9 @@
     </entity>
     <entity name="PlantEntity" representedClassName="PlantEntity" syncable="YES" codeGenerationType="class">
         <attribute name="background" optional="YES" attributeType="String"/>
-        <attribute name="growthStage" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="lastUpdated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="momentCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="pot" optional="YES" attributeType="String"/>
         <attribute name="type" optional="YES" attributeType="String"/>
         <relationship name="relationship" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RelationshipEntity" inverseName="plant" inverseEntity="RelationshipEntity"/>

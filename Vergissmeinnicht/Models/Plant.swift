@@ -12,7 +12,7 @@ struct Plant: Codable, Identifiable {
     let type: String
     var pot: String?
     var background: String?
-    var growthStage: Int
+    var momentCount: Int
     var lastUpdated: Date
     
     init(
@@ -20,22 +20,13 @@ struct Plant: Codable, Identifiable {
         type: String,
         pot: String? = nil,
         background: String? = nil,
-        growthStage: Int = 0
+        momentCount: Int = 0
     ) {
         self.id = id
         self.type = type
         self.pot = pot
         self.background = background
-        self.growthStage = growthStage
-        self.lastUpdated = Date()
-    }
-    
-    func getMaxStage() -> Int {
-        return AppConstants.plantStageCount - 1
-    }
-    
-    mutating func updateStage(_ newStage: Int) {
-        self.growthStage = max(0, min(newStage, getMaxStage()))
+        self.momentCount = momentCount
         self.lastUpdated = Date()
     }
 }

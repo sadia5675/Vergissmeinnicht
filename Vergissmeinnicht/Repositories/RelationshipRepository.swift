@@ -86,7 +86,7 @@ class RelationshipRepository {
             print("   Neuer type: \(existingPlant.type ?? "nil")")
             existingPlant.pot = relationship.plant.pot
             existingPlant.background = relationship.plant.background
-            existingPlant.growthStage = Int32(relationship.plant.growthStage)
+            existingPlant.momentCount = Int32(relationship.plant.momentCount)
             existingPlant.lastUpdated = relationship.plant.lastUpdated
 
         } else {
@@ -165,7 +165,7 @@ class RelationshipRepository {
         entity.type = plant.type
         entity.pot = plant.pot
         entity.background = plant.background
-        entity.growthStage = Int32(plant.growthStage)
+        entity.momentCount = Int32(plant.momentCount)
         entity.lastUpdated = plant.lastUpdated
         
         return entity
@@ -198,7 +198,7 @@ class RelationshipRepository {
             type: entity.plant?.type ?? "cosmos",
             pot: entity.plant?.pot,
             background: entity.plant?.background,
-            growthStage: Int(entity.plant?.growthStage ?? 0)
+            momentCount: Int(entity.plant?.momentCount ?? 0)
         )
 
         let careRhythm = CareRhythm(

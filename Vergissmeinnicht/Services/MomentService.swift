@@ -4,6 +4,7 @@
 //
 //  Created by Sadia Miah on 27.05.26.
 //
+
 import UIKit
 import Foundation
 
@@ -54,12 +55,17 @@ class MomentService {
                 })
             {
 
-                let currentStage =
+                let currentCount =
                     PlantStageService.shared
-                        .calculateStage(for: rel)
+                        .currentMomentCount(
+                            for: rel
+                        )
 
-                rel.plant.growthStage =
-                    min(3, currentStage + 1)
+                rel.plant.momentCount =
+                    min(
+                        9,
+                        currentCount + 1
+                    )
 
                 rel.lastInteractionDate =
                     moment.date

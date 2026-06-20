@@ -53,25 +53,16 @@ class MomentRepository {
                 entityName: "MomentEntity"
             )
 
+        request.predicate =
+            NSPredicate(
+                format: "ANY participants.id == %@",
+                relationshipId as CVarArg
+            )
+
         do {
 
-            let entities =
-                try context.fetch(request)
-
             let filtered =
-                entities.filter {
-
-                    guard let participants =
-                        $0.participants
-                            as? Set<RelationshipEntity>
-                    else {
-                        return false
-                    }
-
-                    return participants.contains {
-                        $0.id == relationshipId
-                    }
-                }
+                try context.fetch(request)
 
             let allTypes =
                 loadInteractionTypes()

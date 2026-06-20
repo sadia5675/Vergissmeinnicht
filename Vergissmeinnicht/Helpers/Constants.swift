@@ -9,7 +9,7 @@ import Foundation
 
 struct AppConstants {
     // MARK: - Plant Stages
-    static let plantStageCount = 5
+    static let plantStageCount = 4
 
     // MARK: - Care Rhythm Presets
     static let careRhythmPresets: [Int] = [3, 7, 14, 30]

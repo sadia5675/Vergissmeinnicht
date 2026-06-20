@@ -23,6 +23,9 @@ class MomentViewModel: ObservableObject {
     @Published var allRelationships: [Relationship] = []
     @Published var interactionTypes: [InteractionType] = []
     
+    private let relationshipService =
+        RelationshipService.shared
+    
     var noteTemplates: [String] {
 
         switch selectedInteractionType.name {
@@ -66,6 +69,18 @@ class MomentViewModel: ObservableObject {
             momentService.loadInteractionTypes()
     }
     
+    
+    private func loadParticipants() {
+
+        let all =
+            relationshipService.loadRelationships()
+
+        allRelationships =
+            all.filter {
+                $0.id != relationship.id
+            }
+    }
+    
     // MARK: - INIT
 
     init(relationship: Relationship) {
@@ -79,11 +94,7 @@ class MomentViewModel: ObservableObject {
 
         self.selectedInteractionType = defaultType
 
-        let all =
-            RelationshipService.shared.loadRelationships()
-
-        self.allRelationships =
-            all.filter { $0.id != relationship.id }
+        loadParticipants()
 
         loadInteractionTypes()
 
