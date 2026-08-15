@@ -9,14 +9,22 @@ import UserNotifications
 import Foundation
 import UIKit
 
+/// Verwaltet alle lokalen Push-Benachrichtigungen der App: Pflegeintervall Erinnerungen, Geburtstage und benutzerdefinierte Erinnerungen
 @MainActor
 class NotificationService {
+
     static let shared = NotificationService()
-    
+    private let textService = TextService.shared
+
     // MARK: - PERMISSION
-    
+
+    /// Fragt den Nutzer einmalig um Erlaubnis für Benachrichtigungen
     func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+        
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]
+        ) { granted, error in
+
             if granted {
                 print("Notification Permission gewährt!")
             } else if let error = error {
@@ -24,167 +32,169 @@ class NotificationService {
             }
         }
     }
-    
+
     // MARK: - INTERVALL REMINDER
-    
+
+    /// Plant eine Erinnerung zum nächsten fälligen Pflegezeitpunkt
     func scheduleIntervalReminder(for relationship: Relationship) {
-        guard let nextReminderDate = relationship.careRhythm.nextReminderDate else { return }
-        
-        let content = UNMutableNotificationContent()
-        content.title = "Zeit für \(relationship.name)!"
-        content.body = "Melde dich bei \(relationship.name). Eure Beziehung ist dir wichtig!"
-        content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
-        
-        // Trigger: zu nextReminderDate
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: nextReminderDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        
-        let request = UNNotificationRequest(
-            identifier: "interval-\(relationship.id)",
-            content: content,
-            trigger: trigger
-        )
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("Fehler bei Notification: \(error)")
-            } else {
-                print("Interval Reminder geplant für \(relationship.name)")
-            }
+
+        guard !relationship.isResting else {
+            return
         }
-    }
-    
-    func refreshIntervalReminder(
-        for relationship: Relationship
-    ) {
-
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(
-                withIdentifiers: [
-                    "interval-\(relationship.id)"
-                ]
-            )
-
-        scheduleIntervalReminder(
-            for: relationship
+        var components = Calendar.current.dateComponents(
+            [.year, .month, .day],
+            from: relationship.careRhythm.nextReminderDate
         )
-    }
-    
-    // MARK: - GEBURTSTAG REMINDER
-    
-    func scheduleBirthdayReminder(for relationship: Relationship) {
-        guard let birthDate = relationship.birthDate else { return }
         
-        let content = UNMutableNotificationContent()
-        content.title = "Herzlichen Glückwunsch!"
-        content.body = "Heute ist \(relationship.name)s Geburtstag! Schreib ihr eine Nachricht!"
-        content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
-        
-        // Trigger: jedes Jahr am Geburtstag (Monat + Tag)
-        var components = Calendar.current.dateComponents([.month, .day], from: birthDate)
-        components.hour = 9  // 9 Uhr morgens
+        components.hour = 9
         components.minute = 0
         
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-        
-        let request = UNNotificationRequest(
-            identifier: "birthday-\(relationship.id)",
-            content: content,
-            trigger: trigger
+        schedule(
+            identifier: "interval-\(relationship.id)",
+            title: textService.texts.notifications.intervalTitle
+                .replacingOccurrences(of: "@NAME", with: relationship.name),
+            body: (textService.texts.notifications.intervalBody.randomElement() ?? "")
+                .replacingOccurrences(of: "@NAME", with: relationship.name),
+            trigger: UNCalendarNotificationTrigger(
+                dateMatching: components,
+                repeats: false
+            )
         )
+    }
+
+    /// Storniert die bestehende Intervall-Erinnerung und plant sie mit den aktuellen Werten neu
+    func refreshIntervalReminder(for relationship: Relationship) {
+        cancel(identifier: "interval-\(relationship.id)")
+        scheduleIntervalReminder(for: relationship)
+    }
+
+    // MARK: - GEBURTSTAG REMINDER
+
+    /// Plant eine jährlich wiederkehrende Geburtstags-Erinnerung
+    func scheduleBirthdayReminder(for relationship: Relationship) {
+
+        guard !relationship.isResting else {
+            return
+        }
+        guard let birthDate = relationship.birthDate else {
+            return
+        }
+        var components = Calendar.current.dateComponents(
+            [.month, .day],
+            from: birthDate
+        )
+        components.hour = 9
+        components.minute = 0
         
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("Fehler bei Birthday Notification: \(error)")
-            } else {
-                print("Birthday Reminder geplant für \(relationship.name)")
-            }
-        }
-    }
-    
-    func refreshBirthdayReminder(
-        for relationship: Relationship
-    ) {
-
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(
-                withIdentifiers: [
-                    "birthday-\(relationship.id)"
-                ]
+        schedule(
+            identifier: "birthday-\(relationship.id)",
+            title: textService.texts.notifications.birthdayTitle,
+            body: textService.texts.notifications.birthdayBody
+                .replacingOccurrences(of: "@NAME", with: relationship.name),
+            trigger: UNCalendarNotificationTrigger(
+                dateMatching: components,
+                repeats: true
             )
+        )
+    }
 
+    /// Storniert die bestehende Geburtstags-Erinnerung und plant sie neu, falls weiterhin ein Geburtsdatum hinterlegt ist
+    func refreshBirthdayReminder(for relationship: Relationship) {
+        cancel(identifier: "birthday-\(relationship.id)")
+       
         if relationship.birthDate != nil {
-
-            scheduleBirthdayReminder(
-                for: relationship
-            )
+            scheduleBirthdayReminder(for: relationship)
         }
     }
-    
+
     // MARK: - CUSTOM REMINDER
 
+    /// Plant eine benutzerdefinierte Erinnerung zum hinterlegten Zeitpunkt
     func scheduleCustomReminder(_ reminder: CustomReminder, for relationship: Relationship) {
-        guard reminder.isActive else { return }
+
+        guard !relationship.isResting else {
+            return
+        }
+        guard reminder.isActive else {
+            return
+        }
         
-        let content = UNMutableNotificationContent()
-        content.title = "\(reminder.label)"
-        content.body = "Erinnerung für \(relationship.name)"
-        content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
+        let components = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: reminder.date
+        )
         
-        // Trigger: zu reminder.date
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.date)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        
-        let request = UNNotificationRequest(
+        schedule(
             identifier: "custom-\(reminder.id)",
+            title: reminder.label,
+            body: textService.texts.notifications.customBody
+                .replacingOccurrences(of: "@NAME", with: relationship.name),
+            trigger: UNCalendarNotificationTrigger(
+                dateMatching: components,
+                repeats: false
+            )
+        )
+    }
+
+    /// Storniert eine bestehende benutzerdefinierte Erinnerung und plant sie neu, sofern sie weiterhin aktiv ist
+    func refreshCustomReminder(_ reminder: CustomReminder, for relationship: Relationship) {
+        cancel(identifier: "custom-\(reminder.id)")
+
+        if reminder.isActive {
+            scheduleCustomReminder(reminder, for: relationship)
+        }
+    }
+
+    /// Storniert eine benutzerdefinierte Erinnerung endgültig
+    func deleteCustomReminder(_ reminder: CustomReminder) {
+        cancel(identifier: "custom-\(reminder.id)")
+    }
+
+    /// Storniert sämtliche geplanten Benachrichtigungen einer Beziehung
+    /// wird beim Eintritt in den Ruhezustand aufgerufen
+    func cancelAllNotifications(for relationship: Relationship) {
+        cancel(identifier: "interval-\(relationship.id)")
+        cancel(identifier: "birthday-\(relationship.id)")
+        for reminder in relationship.customReminders {
+            cancel(identifier: "custom-\(reminder.id)")
+        }
+    }
+
+    // MARK: - HELPER
+
+    /// Baut den Notification-Content (Titel, Text, Sound, Badge) und reicht ihn zusammen mit dem übergebenen Trigger und der eindeutigen ID beim System ein
+    private func schedule(
+        identifier: String,
+        title: String,
+        body: String,
+        trigger: UNCalendarNotificationTrigger
+    ) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        // TODO: Badge-Zahl wird hier nur zum Planungszeitpunkt berechnet nicht zum tatsächlichen Zustellungszeitpunkt
+        content.badge = NSNumber(
+            value: UIApplication.shared.applicationIconBadgeNumber + 1
+        ) 
+        let request = UNNotificationRequest(
+            identifier: identifier,
             content: content,
             trigger: trigger
         )
-        
+
         UNUserNotificationCenter.current().add(request) { error in
+
             if let error = error {
-                print("Fehler bei Custom Reminder: \(error)")
-            } else {
-                print("Custom Reminder geplant: \(reminder.label)")
+                print("Fehler bei Notification \(identifier): \(error)")
             }
         }
     }
-    
-    
-    func refreshCustomReminder(
-        _ reminder: CustomReminder,
-        for relationship: Relationship
-    ) {
 
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(
-                withIdentifiers: [
-                    "custom-\(reminder.id)"
-                ]
-            )
-
-        if reminder.isActive {
-
-            scheduleCustomReminder(
-                reminder,
-                for: relationship
-            )
-        }
+    /// Entfernt eine geplante Notification anhand ihrer ID
+    private func cancel(identifier: String) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: [identifier]
+        )
     }
-    
-    func deleteCustomReminder(
-        _ reminder: CustomReminder
-    ) {
-
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(
-                withIdentifiers: [
-                    "custom-\(reminder.id)"
-                ]
-            )
-    }
-    
 }

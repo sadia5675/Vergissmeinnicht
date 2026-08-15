@@ -8,277 +8,386 @@
 import SwiftUI
 import UserNotifications
 
+/// Detailansicht einer Beziehung mit Anzeige und Bearbeitung aller Informationen, Momente-Timeline und situationsabhängigem Hinweis
 struct DetailView: View {
+
+    // MARK: - Properties
+
     @StateObject var viewModel: DetailViewModel
     @StateObject private var hintViewModel = HintViewModel()
-    @Environment(\.dismiss) var dismiss
-    @State var showMomentView = false
-    @State var isEditing = false
     
-    @State var showAddCustomReminder = false
-    @State var editingReminder: CustomReminder?
-    
-    @State var editName = ""
-    @State var editInterval = 0
-    @State var editBirthDate: Date?
-    @State var hasBirthDate = false
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // MARK: - Header mit Pflanze
-                    PlantCard(relationship: viewModel.relationship, size: .large)
-                    // HINT
-                    if let hint = hintViewModel.detailHint {
+    @Environment(\.dismiss) private var dismiss
 
+    @State private var showMomentView = false
+    @State private var isEditing = false
+    @State private var showAddCustomReminder = false
+    @State private var editingReminder: CustomReminder?
+    @State private var showPlantCustomization = false
+    @State private var editPot: String?
+    @State private var editBackground: String?
+    @State private var editName = ""
+    @State private var editPhoneNumber = ""
+    @State private var editInterval = 0
+    @State private var editBirthDate: Date?
+
+    // MARK: - Computed Properties
+
+    private var previewRelationship: Relationship {
+        var preview = viewModel.relationship
+
+        if isEditing {
+            preview.name = editName
+            preview.plant.pot = editPot
+            preview.plant.background = editBackground
+        }
+        return preview
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        ZStack {
+            Color("Background")
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 18) {
+
+                    // MARK: - Header with Plant
+
+                    PlantCard(relationship: previewRelationship, size: .large, showName: false)
+                        .padding(.horizontal)
+
+                    // MARK: - Edit Plant
+
+                    if isEditing {
+                        SecondaryButton(
+                            title: "Pflanze bearbeiten",
+                            selected: true
+                        ) {
+                            showPlantCustomization = true
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .sheet(isPresented: $showPlantCustomization) {
+                            NavigationStack {
+                                PlantCustomizationView(
+                                    selectedPlant: previewRelationship.plant.type,
+                                    selectedPot: editPot,
+                                    selectedBackground: editBackground,
+                                    canChangePlant: false,
+                                    availablePlants: viewModel.availablePlants,
+                                    availablePots: viewModel.availablePots,
+                                    availableBackgrounds: viewModel.availableBackgrounds
+                                ) { plant, pot, background in
+                                    editPot = pot
+                                    editBackground = background
+
+                                    var updated = viewModel.relationship
+                                    updated.plant.type = plant
+                                    updated.plant.pot = pot
+                                    updated.plant.background = background
+
+                                    viewModel.relationship = updated
+                                }
+                            }
+                            .presentationBackground(Color("Background"))
+                        }
+                    }
+
+                    // MARK: - Hint
+
+                    if !viewModel.relationship.isResting, let hint = hintViewModel.detailHint {
                         HintView(
                             hint: hint,
                             onDismiss: {
-                                hintViewModel.dismissHint(hint.id)
+                                hintViewModel.dismissDetailHint(
+                                    for: viewModel.relationship
+                                )
                             }
                         )
+                        .padding(.horizontal)
                     }
-                    
-                    // MARK: - Infos (editierbar)
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Letzter Kontakt (nicht editierbar)
-                        HStack {
-                            Label("Letzter Kontakt", systemImage: "calendar")
-                            Spacer()
-                            Text(RelationshipDateFormatter.formatDaysSince(
-                                viewModel.relationship.getDaysSinceLastContact()
-                            ))
-                            .fontWeight(.semibold)
-                        }
-                        
-                        Divider()
-                        
-                        // Pflegeintervall (editierbar)
-                        HStack {
-                            Label("Pflegeintervall", systemImage: "hourglass")
-                            Spacer()
-                            if isEditing {
-                                Picker("", selection: $editInterval) {
-                                    ForEach(AppConstants.careRhythmPresets, id: \.self) { interval in
-                                        Text("\(interval) Tage").tag(interval)
-                                    }
-                                }
-                                .frame(width: 120)
-                            } else {
-                                Text("alle \(viewModel.relationship.careRhythm.interval) Tage")
-                                    .fontWeight(.semibold)
+
+                    // MARK: - Editable Info
+
+                    InfoCard(
+                        relationship: viewModel.relationship,
+                        isEditing: isEditing,
+                        editName: $editName,
+                        editPhone: $editPhoneNumber,
+                        editInterval: $editInterval
+                    )
+                    .padding(.horizontal)
+
+                    // MARK: - CareRhythm
+
+                    CareRhythmSection(
+                        interval: Binding(
+                            get: {
+                                isEditing
+                                ? editInterval
+                                : viewModel.relationship.careRhythm.interval
+                            },
+                            set: {
+                                editInterval = $0
                             }
-                        }
-                        
-                        Divider()
-                        
-                        // Geburtstag (editierbar)
-                        HStack {
-                            Label("Geburtstag", systemImage: "birthday.cake")
-                            Spacer()
-                            if isEditing {
-                                Toggle("", isOn: $hasBirthDate)
-                                    .onChange(of: hasBirthDate) { old, new in
-                                        if !new {
-                                            editBirthDate = nil
-                                        } else if editBirthDate == nil {
-                                            editBirthDate = Date()
-                                        }
-                                    }
-                            } else {
-                                if let bday = viewModel.relationship.birthDate {
-                                    Text(bday.formatted(date: .abbreviated, time: .omitted))
-                                        .fontWeight(.semibold)
-                                } else {
-                                    Text("nicht hinzugefügt")
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.gray)
-                                }
+                        ),
+                        isEditing: isEditing
+                    )
+                    .padding(.horizontal)
+
+                    // MARK: - Birthday
+
+                    BirthdaySection(
+                        birthday: Binding(
+                            get: {
+                                isEditing
+                                ? editBirthDate
+                                : viewModel.relationship.birthDate
+                            },
+                            set: {
+                                editBirthDate = $0
                             }
-                        }
-                        
-                        // DatePicker wenn Geburtstag aktiviert
-                        if isEditing && hasBirthDate && editBirthDate != nil {
-                            DatePicker(
-                                "Datum",
-                                selection: Binding(
-                                    get: { editBirthDate ?? Date() },
-                                    set: { editBirthDate = $0 }
-                                ),
-                                displayedComponents: [.date]
+                        ),
+                        isEditing: isEditing
+                    )
+                    .padding(.horizontal)
+
+                    // MARK: - Reminders
+
+                    if !viewModel.relationship.isResting {
+
+                        ReminderSection(
+                            title: "Erinnerungen",
+                            reminders: viewModel.relationship.customReminders,
+                            isEditing: isEditing,
+                            onAdd: {
+                                showAddCustomReminder = true
+                            },
+                            onTap: { reminder in
+                                editingReminder = reminder
+                            }
+                        )
+                        .padding(.horizontal)
+
+                        // New Reminders
+                        .sheet(isPresented: $showAddCustomReminder) {
+                            CustomReminderView(
+                                viewModel: CustomReminderViewModel(
+                                    relationship: viewModel.relationship
+                                )
                             )
-                            .padding(.leading, 40)
+                        }
+
+                        .onChange(of: showAddCustomReminder) { _, newValue in
+                            if !newValue {
+                                viewModel.loadRelationship()
+                            }
+                        }
+                        
+                        // Edit Reminders
+                        .sheet(item: $editingReminder) { reminder in
+                            CustomReminderView(
+                                viewModel: CustomReminderViewModel(
+                                    relationship: viewModel.relationship,
+                                    editing: reminder
+                                )
+                            )
+                        }
+
+                        .onChange(of: editingReminder) { _, newValue in
+                            if newValue == nil {
+                                viewModel.loadRelationship()
+                            }
                         }
                     }
-                    .padding()
-                    .background(Color.gray.opacity(0.05))
-                    .cornerRadius(8)
-                    
-                    
-                    // MARK: - Custom Reminders
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Erinnerungen")
-                                .font(.headline)
-                            
-                            Spacer()
-                            
-                            Button(action: { showAddCustomReminder = true }) {
-                                Image(systemName: "plus.circle")
-                                    .foregroundColor(.blue)
-                            }
+
+                    // MARK: - Action Buttons
+
+                    if !viewModel.relationship.isResting, !isEditing {
+                        PrimaryButton(
+                            title: "Moment hinzufügen",
+                            selected: true
+                        ) {
+                            showMomentView = true
                         }
                         .padding(.horizontal)
-                        
-                        if viewModel.relationship.customReminders.isEmpty {
-                            Text("Keine Erinnerungen")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                                .padding(.horizontal)
-                        } else {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(viewModel.relationship.customReminders) { reminder in
-                                    CustomReminderCard(
-                                        reminder: reminder,
-                                        isEditing: isEditing,
-                                        onToggle: { isActive in viewModel.updateReminder(reminder, isActive: isActive) },
-                                        onDelete: { viewModel.deleteReminder(reminder) },
-                                        onTap: {
-                                            editingReminder = reminder
-                                        }
-                                    )
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    // Sheet 1: Neuen Reminder erstellen
-                    .sheet(isPresented: $showAddCustomReminder) {
-                        CustomReminderView(
-                            viewModel: CustomReminderViewModel(relationship: viewModel.relationship)
-                        )
-                    }
-                    .onChange(of: showAddCustomReminder) { oldValue, newValue in
-                        if !newValue {
-                            viewModel.loadRelationship()
-                        }
-                    }
-                    
-                    // Sheet 2: Existierenden Reminder bearbeiten
-                    .sheet(item: $editingReminder) { reminder in
-                        CustomReminderView(
-                            viewModel: CustomReminderViewModel(relationship: viewModel.relationship, editing: reminder)
-                        )
-                    }
-                    .onChange(of: editingReminder) { oldValue, newValue in
-                        if newValue == nil {
-                            viewModel.loadRelationship()
-                        }
-                    }
-                    // MARK: - Action Buttons
-                    HStack(spacing: 12) {
-                        Button(action: { showMomentView = true }) {
-                            Label("Moment", systemImage: "plus.circle")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
                         .sheet(isPresented: $showMomentView) {
-                            MomentView(viewModel: MomentViewModel(relationship: viewModel.relationship))
+                            MomentView(
+                                viewModel: MomentViewModel(
+                                    relationship: viewModel.relationship
+                                )
+                            )
                         }
-                        .onChange(of: showMomentView) { oldValue, newValue in
+                        .onChange(of: showMomentView) { _, newValue in
                             if !newValue {
                                 viewModel.loadRelationship()
                                 viewModel.loadMoments()
+
                                 hintViewModel.loadHint(
                                     for: viewModel.relationship
                                 )
                             }
                         }
                     }
-                    
+
                     // MARK: - Timeline
-                    VStack(alignment: .leading, spacing: 12) {
+
+                    VStack(alignment: .leading, spacing: 18) {
                         Text("Momente")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(Color("PrimaryDark"))
+
                         if viewModel.moments.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "calendar.badge.exclamationmark")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.gray)
-                                
-                                Text("Noch keine Momente")
-                                    .foregroundColor(.gray)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                            EmptyStateView(
+                                title: "Noch keine Momente",
+                                subtitle: "",
+                                icon: "photo.on.rectangle",
+                                size: .compact
+                            )
+
                         } else {
-                            VStack(alignment: .leading, spacing: 0) {
-                                ForEach(Array(viewModel.moments.enumerated()), id: \.element.id) { index, moment in
-                                    TimelineCard(
-                                        moment: moment,
-                                        isLast: index == viewModel.moments.count - 1,
-                                        photo: viewModel.photoFor(moment),
-                                        participants: viewModel.participants(for: moment)
-                                    )                                }
+                            ScrollView {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(
+                                        Array(viewModel.moments.enumerated()),
+                                        id: \.element.id
+                                    ) { index, moment in
+                                        
+                                        TimelineCard(
+                                            moment: moment,
+                                            isLast: index == viewModel.moments.count - 1,
+                                            photo: viewModel.photoFor(moment),
+                                            participants: viewModel.participants(for: moment)
+                                        )
+                                    }
+                                }
                             }
-                            .padding(.horizontal)
+                            .frame(maxHeight: 350)
                         }
                     }
-                    
-                    Spacer()
+                    .padding(20)
+                    .background(Color.white)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(Color("Border"), lineWidth: 1.5)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .padding(.horizontal)
+
+                    if viewModel.relationship.isResting {
+                        SecondaryButton(
+                            title: "Zurück in den Garten",
+                            selected: true
+                        ) {
+                            viewModel.toggleResting()
+                        }
+                        .padding(.horizontal)
+
+                    } else if isEditing {
+                        SecondaryButton(
+                            title: "Zur Ruhe legen",
+                            selected: false
+                        ) {
+
+                            viewModel.toggleResting()
+                        }
+                        .padding(.horizontal)
+                    }
                 }
                 .navigationTitle("Details")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Zurück") { dismiss() }
-                    }
-                    
-                    ToolbarItem(placement: .topBarTrailing) {
-                        if isEditing {
-                            Button("Speichern") {
-                                viewModel.saveChanges(name: editName, interval: editInterval, birthDate: editBirthDate)
+                        Button {
+                            if isEditing {
                                 isEditing = false
+
+                            } else {
+                                dismiss()
                             }
-                            .disabled(editName.isEmpty)
-                        } else {
-                            Button("Bearbeiten") {
-                                startEditing()
-                                isEditing = true
+
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "chevron.left")
+                                Text("Zurück")
+                            }
+                            .font(.headline)
+                        }
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        if !viewModel.relationship.isResting {
+                            if isEditing {
+                                Button {
+                                    viewModel.saveChanges(
+                                        pot: editPot,
+                                        background: editBackground,
+                                        name: editName,
+                                        phoneNumber: editPhoneNumber,
+                                        interval: editInterval,
+                                        birthDate: editBirthDate
+                                    )
+                                    isEditing = false
+
+                                } label: {
+                                    Text("Speichern")
+                                        .fontWeight(.bold)
+                                }
+                                .disabled(editName.isEmpty)
+
+                            } else {
+                                Button {
+                                    startEditing()
+                                    isEditing = true
+
+                                } label: {
+                                    Text("Bearbeiten")
+                                        .fontWeight(.semibold)
+                                }
                             }
                         }
                     }
                 }
+                .navigationBarBackButtonHidden(true)
             }
-            
         }
         .onAppear {
-            print("DetailView appeared")
-   
+
             hintViewModel.loadHint(
-             for: viewModel.relationship
+                for: viewModel.relationship
             )
         }
     }
-    
-    // MARK: - Helper Functions
-    
+
+    // MARK: - Helper Function
+
     func startEditing() {
+        editPot = viewModel.relationship.plant.pot
+        editBackground = viewModel.relationship.plant.background
         editName = viewModel.relationship.name
+        editPhoneNumber = viewModel.relationship.phoneNumber
         editInterval = viewModel.relationship.careRhythm.interval
         editBirthDate = viewModel.relationship.birthDate
-        hasBirthDate = viewModel.relationship.birthDate != nil
     }
 }
-    
-    /*#Preview {
-        let rel = Relationship(
-            name: "Anna",
-            plant: Plant(type: "pansy"),
-            careRhythm: CareRhythm(interval: 7)
+#Preview {
+    NavigationStack {
+        DetailView(
+            viewModel: DetailViewModel(
+                relationship: Relationship(
+                    name: "Anna Haro",
+                    phoneNumber: "0170123456",
+                    birthDate: .now,
+                    plant: Plant(
+                        type: "cosmos",
+                        pot: "pot",
+                        background: "bg_watercolor"
+                    ),
+                    careRhythm: CareRhythm(interval: 7)
+                )
+            )
         )
-        DetailView(viewModel: DetailViewModel(relationship: rel))
-    }*/
+    }
+}

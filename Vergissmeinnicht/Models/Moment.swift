@@ -7,11 +7,15 @@
 
 import Foundation
 
+/// Ein einzelner, dokumentierter Interaktions-Moment zwischen dem Nutzer:innen und einer oder mehreren Beziehungen
 struct Moment: Codable, Identifiable {
     let id: UUID
+    
+    /// IDs aller Beziehungen, die an diesem Moment beteiligt waren
     var relationshipIds: [UUID]
+    
     var date: Date
-    var type: InteractionType
+    var interactionType: InteractionType
     var notes: String?
     var photoPath: String?
     
@@ -19,14 +23,14 @@ struct Moment: Codable, Identifiable {
         id: UUID = UUID(),
         relationshipIds: [UUID],
         date: Date = Date(),
-        type: InteractionType,
+        interactionType: InteractionType,
         notes: String? = nil,
-        photoPath: String? = nil,
+        photoPath: String? = nil
     ) {
         self.id = id
         self.relationshipIds = relationshipIds
         self.date = date
-        self.type = type
+        self.interactionType = interactionType
         self.notes = notes
         self.photoPath = photoPath
     }

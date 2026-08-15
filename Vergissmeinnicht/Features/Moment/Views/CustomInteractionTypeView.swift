@@ -7,100 +7,135 @@
 
 import SwiftUI
 
+/// Sheet zum Erstellen einer benutzerdefinierten Interaktionskategorie mit Symbolauswahl und Namen
 struct CustomInteractionTypeView: View {
+
+    // MARK: - Properties
+
     @StateObject var viewModel = CustomInteractionTypeViewModel()
-    @Environment(\.dismiss) var dismiss
-    
-    let onSave: (InteractionType) -> Void  // Callback
-    
-    let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 5)
-    
+
+    @Environment(\.dismiss) private var dismiss
+
+    let onSave: (InteractionType) -> Void
+
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: 12),
+        count: 5
+    )
+
+    // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
+
+                // MARK: - Header
+
                 Text("Was passt zu eurem Moment?")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                
-                Text("Wähle ein Symbol aus.")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-                    TextField("Suche...z.B Kino, Sport", text: $viewModel.searchText)
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
-                .padding(.horizontal)
-                
+                    .font(.title.bold())
+                    .foregroundStyle(Color("PrimaryDark"))
+
+                Text("Wähle ein Symbol und gib eurem Moment einen Namen.")
+                    .foregroundStyle(Color("Primary"))
+
+                // MARK: - Search
+
+                BorderedTextField(
+                    icon: "magnifyingglass",
+                    placeholder: "Suche z.B. Kino oder Sport",
+                    text: $viewModel.searchText
+                )
+
+                // MARK: - Symbols
+
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 12) {
+
+                    LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(viewModel.filteredSymbols, id: \.self) { symbol in
-                            Button(action: { viewModel.selectedSymbol = symbol }) {
+
+                            Button {
+                                viewModel.selectedSymbol = symbol
+
+                            } label: {
                                 Image(systemName: symbol)
                                     .font(.system(size: 24))
-                                    .foregroundColor(viewModel.selectedSymbol == symbol ? .white : .green)
-                                    .frame(width: 50, height: 50)
-                                    .background(viewModel.selectedSymbol == symbol ? Color.green : Color.gray.opacity(0.1))
-                                    .cornerRadius(8)
+                                    .foregroundStyle(
+                                        viewModel.selectedSymbol == symbol
+                                        ? Color.white
+                                        : Color("PrimaryDark")
+                                    )
+                                    .frame(width: 54, height: 54)
+                                    .background(
+                                        viewModel.selectedSymbol == symbol
+                                        ? Color("PrimaryDark")
+                                        : Color("Surface")
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(
+                                                Color("Border"),
+                                                lineWidth: viewModel.selectedSymbol == symbol ? 0 : 2
+                                            )
+                                    }
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
                             }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal)
                 }
-                
+
                 Divider()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Ausgewählt:")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
-                    HStack {
-                        Image(systemName: viewModel.selectedSymbol)
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(Color.green)
-                            .cornerRadius(8)
-                        
-                        TextField("Name für euren Moment...", text: $viewModel.customTypeName)
-                            .padding()
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
+
+                // MARK: - Preview
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Moment")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(Color("PrimaryDark"))
+
+                    HStack(spacing: 16) {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color("PrimaryDark"))
+                            .frame(width: 56, height: 56)
+                            .overlay {
+                                Image(systemName: viewModel.selectedSymbol)
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(Color.white)
+                            }
+
+                        BorderedTextField(
+                            placeholder: "Name für euren Moment...",
+                            text: $viewModel.customTypeName
+                        )
                     }
                 }
-                .padding(.horizontal)
-                
-                Button(action: {
+
+                Spacer()
+
+                // MARK: - Save
+
+                PrimaryButton(
+                    title: "Moment benennen",
+                    selected: !viewModel.customTypeName.isEmpty
+                ) {
+
                     if let newType = viewModel.save() {
-                        onSave(newType)  // Callback
+                        onSave(newType)
                         dismiss()
                     }
-                }) {
-                    Text("Moment benennen")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(viewModel.customTypeName.isEmpty ? Color.gray : Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
                 }
-                .disabled(viewModel.customTypeName.isEmpty)
-                .padding(.horizontal)
-                .padding(.bottom)
+                .disabled(
+                    viewModel.customTypeName.isEmpty
+                )
             }
-            .navigationTitle("Neues Symbol")
+            .padding()
+            .background(Color("Background"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Abbrechen") { dismiss() }
+                    Button("Abbrechen") {
+                        dismiss()
+                    }
                 }
             }
         }

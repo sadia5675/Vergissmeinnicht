@@ -9,85 +9,121 @@ import UIKit
 import Combine
 import Foundation
 
+/// ViewModel für die Detailansicht einer Beziehung
 @MainActor
 class DetailViewModel: ObservableObject {
+
+    // MARK: - Published Properties
+
     @Published var relationship: Relationship
     @Published var moments: [Moment] = []
+
+    /// Alle Beziehungen
     @Published var allRelationships: [Relationship] = []
-   // @Published var hint: Hint?
-    
+
+    // MARK: - Dependencies
+
     private let relationshipService = RelationshipService.shared
-    private let momentService =
-        MomentService.shared
-    
-    // private let hintService = HintService.shared
-    
+    private let momentService = MomentService.shared
+    private let imageService = ImageService.shared
+
+    // MARK: - Plant Customization Catalog
+
+    var availablePlants: [ImageCatalogEntry] {
+        imageService.loadPlants()
+    }
+    var availablePots: [ImageCatalogEntry] {
+        imageService.loadPots()
+    }
+    var availableBackgrounds: [ImageCatalogEntry] {
+        imageService.loadBackgrounds()
+    }
+
+    // MARK: - Initialization
+
     init(relationship: Relationship) {
         self.relationship = relationship
-        allRelationships =
-              RelationshipService.shared
-                  .loadRelationships()
+        allRelationships = relationshipService.loadRelationships()
         loadMoments()
-       // loadHint()
     }
-    func participants(
-        for moment: Moment
-    ) -> [Relationship] {
 
+    // MARK: - Loading
+
+    /// Sucht anhand der gespeicherten Beziehungs-IDs eines Moments die zugehörigen Relationship-Objekte 
+    func participants(for moment: Moment) -> [Relationship] {
         allRelationships.filter {
             moment.relationshipIds.contains($0.id)
         }
     }
-    
+
+    /// Lädt die Beziehung sowie alle Beziehungen neu, damit die Ansicht den aktuellen Stand nach einer Änderung anzeigt
     func loadRelationship() {
         let updated = relationshipService.loadRelationships()
             .first { $0.id == relationship.id }
-        if let updated = updated {
+
+        if let updated {
             self.relationship = updated
-            print("Relationship reloaded!")
+            allRelationships = relationshipService.loadRelationships()
         }
     }
-    
-   // func loadHint() {
-    //    let hints = hintService.generateHintsForDetail(for: relationship)
-    //    hint = hints.first
-   // }
-    
-    
-       func loadMoments() {
-           moments = momentService.loadMoments(for: relationship.id)
-                      .sorted { $0.date > $1.date }
-              self.relationship.moments = moments
-            //loadHint()
-              print("\(moments.count) Moments in Relationship eingefügt")
-              }
 
-    func saveChanges(name: String, interval: Int, birthDate: Date?) {
+    /// Lädt alle Momente dieser Beziehung, neueste zuerst
+    func loadMoments() {
+        moments = momentService.loadMoments(for: relationship.id)
+            .sorted { $0.date > $1.date }
+        relationship.moments = moments
+    }
+
+    /// Lädt das zu einem Moment gehörende Foto anhand des gespeicherten Pfads
+    func photoFor(_ moment: Moment) -> UIImage? {
+        guard let path = moment.photoPath else {
+            return nil
+        }
+        return momentService.loadPhoto(path)
+    }
+
+    // MARK: - Editing
+
+    /// Übernimmt die im Bearbeitungsmodus geänderten Werte und speichert die Beziehung
+    func saveChanges(
+        pot: String?,
+        background: String?,
+        name: String,
+        phoneNumber: String,
+        interval: Int,
+        birthDate: Date?
+    ) {
+
         var updated = relationship
+        updated.plant.pot = pot
+        updated.plant.background = background
         updated.name = name
+        updated.phoneNumber = phoneNumber
         updated.careRhythm.interval = interval
         updated.birthDate = birthDate
+
+        // Nächste Erinnerung anhand des neuen Pflegerhythmus neu berechnen, ausgehend vom letzten bekannten Kontakt
         updated.careRhythm.nextReminderDate = Calendar.current.date(
-            byAdding: .day, value: interval,
-            to: updated.lastInteractionDate ?? Date()
-        )
+            byAdding: .day,
+            value: interval,
+            to: updated.lastInteractionDate
+        ) ?? updated.lastInteractionDate
+
         relationshipService.updateRelationship(updated)
         self.relationship = updated
         loadRelationship()
     }
     
-    func photoFor(_ moment: Moment) -> UIImage? {
-        guard let path = moment.photoPath else { return nil }
-        return momentService.loadPhoto(path)
+    /// Versetzt die Beziehung in den Ruhezustand oder holt sie daraus zurück
+    func toggleResting() {
+        relationshipService.toggleResting(relationship)
+        loadRelationship()
     }
-    
-    func updateReminder(
-        _ reminder: CustomReminder,
-        isActive: Bool
-    ) {
 
-        print("Toggle gedrückt: \(isActive)")
+    // MARK: - Reminders
 
+    /// Aktiviert oder deaktiviert eine bestehende Erinnerung
+    func updateReminder(_ reminder: CustomReminder, isActive: Bool) {
         var updatedReminder = reminder
         updatedReminder.isActive = isActive
 
@@ -95,55 +131,22 @@ class DetailViewModel: ObservableObject {
             updatedReminder,
             in: relationship
         )
-
         loadRelationship()
     }
-    
-    func deleteReminder(
-        _ reminder: CustomReminder
-    ) {
 
+    func deleteReminder(_ reminder: CustomReminder) {
         relationshipService.deleteReminder(
             reminder,
             from: relationship
         )
-
         loadRelationship()
     }
-    
-    func addReminder(
-        _ reminder: CustomReminder
-    ) {
 
+    func addReminder(_ reminder: CustomReminder) {
         relationshipService.addReminder(
             reminder,
             to: relationship
         )
-
         loadRelationship()
     }
-
-    
-  /*  func recordMoment() {
-        let moment = Moment(
-            relationshipIds: [relationship.id],
-            date: Date(),
-            type: InteractionType(
-                id: UUID(),
-                name: "Nachricht",
-                sfSymbol: "bubble.right",
-                isCustom: false
-            )
-        )
-        
-        relationshipService.saveMoment(moment)
-        
-        var updated = relationship
-        updated.lastInteractionDate = moment.date
-        updated.moments.append(moment)
-        relationshipService.saveRelationship(updated)
-        self.relationship = updated
-        loadMoments() 
-    }*/
 }
-

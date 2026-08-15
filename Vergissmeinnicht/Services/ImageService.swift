@@ -8,6 +8,7 @@
 import UIKit
 import Foundation
 
+/// Lädt Bild-Katalogeinträge und Bilder für Pflanzen, Töpfe und Hintergründe
 @MainActor
 class ImageService {
     
@@ -17,20 +18,21 @@ class ImageService {
     
     // MARK: - LOAD
     
-    func loadPlants() -> [(name: String, displayName: String)] {
+    func loadPlants() -> [ImageCatalogEntry] {
         repository.loadImages(type: "plant")
     }
-    
-    func loadPots() -> [(name: String, displayName: String)] {
+
+    func loadPots() -> [ImageCatalogEntry] {
         repository.loadImages(type: "pot")
     }
-    
-    func loadBackgrounds() -> [(name: String, displayName: String)] {
+
+    func loadBackgrounds() -> [ImageCatalogEntry] {
         repository.loadImages(type: "background")
     }
     
     // MARK: - GET IMAGE
     
+    /// Lädt das Bild einer Pflanze für eine bestimmte Wachstumsstufe
     func getPlantImage(name: String, stage: Int) -> UIImage? {
         UIImage(named: "\(name)_\(stage)")
     }
@@ -45,15 +47,12 @@ class ImageService {
     
     // MARK: - SEEDS
     
+    /// Befüllt den Bild-Katalog beim ersten App-Start mit den mitgelieferten Pflanzen, Töpfen und Hintergründen
     func seedIfNeeded() {
         guard repository.needsSeeding() else {
-            print("✅ Seeds bereits vorhanden")
             return
         }
         
-        print("🌱 Lade Seeds...")
-        
-        // Pflanzen
         let plants = [
             ("cosmos", "Kosmos"),
             ("pansy", "Stiefmütterchen"),
@@ -65,7 +64,6 @@ class ImageService {
             repository.seedImage(type: "plant", name: name, displayName: display)
         }
         
-        // Pots
         let pots = [
             ("hat", "Hut"),
             ("pot", "Topf"),
@@ -77,7 +75,6 @@ class ImageService {
             repository.seedImage(type: "pot", name: name, displayName: display)
         }
         
-        // Backgrounds
         let backgrounds = [
             ("bg_watercolor",   "Wasserfarben"),
             ("bg_wallpaper",    "Tapete"),
@@ -89,11 +86,8 @@ class ImageService {
             ("bg_SageGreen",    "Salbeigrün"),
             ("bg_lightGreen",   "Hellgrün")
         ]
-        
         for (name, display) in backgrounds {
             repository.seedImage(type: "background", name: name, displayName: display)
         }
-        
-        print("✅ Seeds geladen!")
     }
 }

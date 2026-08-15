@@ -8,29 +8,38 @@
 import Combine
 import Foundation
 
+/// ViewModel für das Erstellen, Bearbeiten und Löschen benutzerdefinierter Erinnerungen
 @MainActor
 class CustomReminderViewModel: ObservableObject {
 
-    // MARK: - PUBLISHED
+    // MARK: - Published Properties
+
+    /// Eingabewerte für die Erinnerung
     @Published var label: String = ""
     @Published var date: Date = Date()
-    @Published var isActive: Bool = true
-    @Published var isLoading = false
+    @Published var isActive: Bool = true // TODO: Switch einbauen
+
+    /// Gibt an, ob eine bestehende Erinnerung bearbeitet wird
     @Published var isEditing = false
 
-    // MARK: - PROPERTIES
+    /// Zustand
+    @Published var isLoading = false
+    @Published var errorMessage: String?
 
+    // MARK: - Dependencies
+
+    private let relationshipService = RelationshipService.shared
+
+    /// Beziehung, zu der die Erinnerung gehört
     private let relationship: Relationship?
 
-    private let relationshipService =
-        RelationshipService.shared
+    /// Bestehende Erinnerung im Bearbeitungsmodus
+    private var editingReminder: CustomReminder?
 
-    private var editingReminder:
-        CustomReminder?
-    
+    /// Callback für den Fall, dass eine Erinnerung ohne direkte Beziehung erstellt wird
     private let onSave: ((CustomReminder) -> Void)?
 
-    // MARK: - INIT
+    // MARK: - Initialization
 
     init(
         relationship: Relationship? = nil,
@@ -41,22 +50,17 @@ class CustomReminderViewModel: ObservableObject {
         self.relationship = relationship
         self.onSave = onSave
 
-        // EDIT MODE
+        // Bearbeitungsmodus: vorhandene Erinnerung laden
         if let reminder = reminder {
-
             self.editingReminder = reminder
-
             self.label = reminder.label
-
             self.date = reminder.date
-
             self.isActive = reminder.isActive
-
             self.isEditing = true
 
         } else {
 
-            // CREATE MODE
+            // Erstellmodus: Standarddatum auf den nächsten Tag setzen
             self.date = Calendar.current.date(
                 byAdding: .day,
                 value: 1,
@@ -65,42 +69,43 @@ class CustomReminderViewModel: ObservableObject {
         }
     }
 
-    // MARK: - SAVE
+    // MARK: - Save
 
-    func save() {
+    /// Erstellt eine neue Erinnerung oder aktualisiert eine bestehende Erinnerung
+    func saveCustomReminder() -> Bool {
 
-        guard !label.isEmpty else {
-            return
+        guard !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Bitte gib einen Erinnerungstitel an."
+            return false
         }
 
+        errorMessage = nil
         isLoading = true
+        defer { isLoading = false }
 
+        // Bearbeitungsmodus: bestehende Erinnerung aktualisieren
         if let editingReminder = editingReminder {
-            
-            guard let relationship else {
-                   return
-               }
 
-            let updatedReminder =
-                CustomReminder(
-                    id: editingReminder.id,
-                    date: date,
-                    label: label,
-                    isActive: isActive
-                )
+            let updatedReminder = CustomReminder(
+                id: editingReminder.id,
+                date: date,
+                label: label,
+                isActive: isActive
+            )
 
-            relationshipService
-                .updateReminder(
+            if let relationship {
+                relationshipService.updateReminder(
                     updatedReminder,
                     in: relationship
                 )
 
-            print(
-                "Reminder aktualisiert: \(label)"
-            )
+            } else {
+                onSave?(updatedReminder)
+            }
 
         } else {
 
+            // Erstellmodus: neue Erinnerung anlegen
             let reminder = CustomReminder(
                 date: date,
                 label: label,
@@ -108,49 +113,47 @@ class CustomReminderViewModel: ObservableObject {
             )
 
             if let relationship {
-
+                // Erinnerung direkt zu einer Beziehung hinzufügen
                 relationshipService.addReminder(
                     reminder,
                     to: relationship
                 )
 
             } else {
-
+                // Erinnerung über Callback zurückgeben
                 onSave?(reminder)
             }
-
-            print(
-                "Reminder hinzugefügt: \(label)"
-            )
         }
 
-        isLoading = false
+        return true
     }
 
-    // MARK: - DELETE
+    // MARK: - Delete
 
+    /// Entfernt eine bestehende benutzerdefinierte Erinnerung
     func delete() {
 
-        guard let editingReminder = editingReminder else {
+        guard let editingReminder else {
             return
         }
 
-        guard let relationship = relationship else {
+        guard let relationship else {
             return
         }
 
         isLoading = true
+        defer { isLoading = false }
 
-        relationshipService
-            .deleteReminder(
-                editingReminder,
-                from: relationship
-            )
-
-        print(
-            "Reminder gelöscht: \(editingReminder.label)"
+        relationshipService.deleteReminder(
+            editingReminder,
+            from: relationship
         )
 
-        isLoading = false
+        print("Reminder gelöscht: \(editingReminder.label)")
+    }
+
+    /// Gibt an, ob die Erinnerung gelöscht werden kann
+    var canDelete: Bool {
+        relationship != nil
     }
 }

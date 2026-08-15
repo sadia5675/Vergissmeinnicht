@@ -7,192 +7,224 @@
 
 import SwiftUI
 
+/// Formular zum Festhalten eines Moments, sowie Auslösen und Verwaltung der Wachstums-Animation nach dem Speichern
 struct MomentView: View {
+
+    // MARK: - Properties
+
     @StateObject var viewModel: MomentViewModel
-    @Environment(\.dismiss) var dismiss
-    @State var showCustomTypePicker = false
-    @State private var showImagePicker = false
     
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showCustomTypePicker = false
+    @State private var showImagePicker = false
+    @State private var showGrowthView = false
+    @State private var growthQueue: [GrowthItem] = []
+
+    var showHeader: Bool = true
+
+    // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            Form {
-                // MARK: - Header
-                Section {
-                    HStack {
-                        Image(systemName: "leaf.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.green)
-                        
-                        VStack(alignment: .leading) {
-                            Text(viewModel.relationship.name)
-                                .font(.headline)
-                            Text("Moment festhalten")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        
-                        Spacer()
-                    }
-                }
-                
-                // MARK: - Weitere Teilnehmer
-                if !viewModel.allRelationships.isEmpty {
-                    Section {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Wer war dabei?")
-                                .font(.headline)
-                            Text("Mehrere auswählen möglich.")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        
-                        ForEach(viewModel.allRelationships) { rel in
-                            Button(action: { viewModel.toggleParticipant(rel.id) }) {
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(rel.name)
-                                            .font(.body)
-                                            .foregroundColor(.primary)
-                                        Text(RelationshipDateFormatter.formatDaysSince(
-                                            rel.getDaysSinceLastContact()
-                                        ))
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                    }
-                                    Spacer()
-                                    Image(systemName: viewModel.additionalParticipants.contains(rel.id)
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                                    )
-                                    .foregroundColor(viewModel.additionalParticipants.contains(rel.id)
-                                        ? .green
-                                        : .gray
-                                    )
-                                    .font(.title3)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+
+                    // MARK: - Header (nur wenn eine feste Person vorgegeben ist)
+
+                    if showHeader,
+                       let relationship = viewModel.preselectedRelationship {
+
+                        HStack(spacing: 16) {
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color("Secondary"))
+                                .frame(width: 72, height: 72)
+                                .overlay {
+                                    Image(systemName: "leaf.fill")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(Color("PrimaryDark"))
                                 }
+
+                            VStack(alignment: .leading) {
+                                Text(relationship.name)
+                                    .font(.headline)
+
+                                Text("Halte einen gemeinsamen Moment fest")
+                                    .foregroundStyle(Color("Primary"))
                             }
+
+                            Spacer()
                         }
-                    }
-                }
-                
-                // MARK: - Interaktionstyp
-                Section("Was hast du gemacht?") {
-                    Picker("Typ", selection: $viewModel.selectedInteractionType) {
-                        ForEach(viewModel.interactionTypes, id: \.id) { type in
-                            Label(type.name, systemImage: type.sfSymbol)
-                                .tag(type)
+                        .padding()
+                        .background(Color.white)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(Color("Border"), lineWidth: 1.5)
                         }
-                    }
-                    
-                    Button(action: { showCustomTypePicker = true }) {
-                        Label("Sonstiges (eigenes Symbol)", systemImage: "plus.circle")
-                            .foregroundColor(.green)
-                    }
-                }
-                
-                // MARK: - Notizen
-                Section("Notizen (optional)") {
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-
-                        HStack {
-
-                            ForEach(viewModel.noteTemplates, id: \.self) { template in
-
-                                Button(template) {
-
-                                    if viewModel.notes.isEmpty {
-
-                                        viewModel.notes = template
-
-                                    } else {
-
-                                        viewModel.notes += "\n" + template
-                                    }
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Color.green.opacity(0.15)
-                                )
-                                .foregroundColor(.green)
-                                .clipShape(Capsule())
-                            }
-                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
                     }
 
-                    TextEditor(text: $viewModel.notes)
-                        .frame(height: 100)
-                }
-                
-                // Nach Notizen-Section, vor Save-Button:
-                Section("Foto (optional)") {
-                    if let image = viewModel.selectedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 150)
-                            .clipped()
-                            .cornerRadius(8)
-                        
-                        Button("Foto entfernen") {
-                            viewModel.selectedImage = nil
+                    // MARK: - Participants
+
+                    ParticipantSection(
+                        relationships: viewModel.allRelationships,
+                        selectedParticipants: $viewModel.selectedParticipants
+                    )
+
+                    // MARK: - Interaction Type
+
+                    InteractionTypeSection(
+                        interactionTypes: viewModel.interactionTypes,
+                        selectedType: $viewModel.selectedInteractionType,
+                        onAddCustom: {
+                            showCustomTypePicker = true
                         }
-                        .foregroundColor(.red)
-                    } else {
-                        Button(action: { showImagePicker = true }) {
-                            Label("Foto hinzufügen", systemImage: "photo")
-                        }
+                    )
+
+                    // MARK: - Photo
+
+                    PhotoSection(image: $viewModel.selectedImage)
+
+                    // MARK: - Date
+
+                    VStack(alignment: .leading, spacing: 18) {
+                        DateTimeCard(
+                            date: $viewModel.selectedDate,
+                            maxDate: Date()
+                        )
                     }
-                }
-                .sheet(isPresented: $showImagePicker) {
-                    ImagePicker(image: $viewModel.selectedImage)
-                }
-                
-                // MARK: - Save Button
-                Section {
-                    Button(action: save) {
-                        if viewModel.isLoading {
-                            ProgressView()
-                        } else {
-                            Text("Moment speichern")
-                                .frame(maxWidth: .infinity)
-                        }
+                    .padding(20)
+                    .background(Color.white)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(Color("Border"), lineWidth: 1.5)
                     }
-                    .disabled(viewModel.isLoading)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+
+                    // MARK: - Notes
+
+                    NotesSection(
+                        notes: $viewModel.notes,
+                        templates: viewModel.noteTemplates
+                    )
+
+                    // MARK: - Save Button
+
+                    PrimaryButton(
+                        title: viewModel.isLoading
+                        ? "Speichern..."
+                        : "Moment speichern",
+                        selected: true
+                    ) {
+                        save()
+                    }
+                    .disabled(
+                        viewModel.isLoading ||
+                        viewModel.selectedParticipants.isEmpty
+                    )
                 }
+                .padding()
             }
+            .background(Color("Background"))
             .sheet(isPresented: $showCustomTypePicker) {
                 CustomInteractionTypeView { newType in
-
                     viewModel.loadInteractionTypes()
-
-                    viewModel.selectedInteractionType =
-                        newType
+                    viewModel.selectedInteractionType = newType
                 }
             }
-            .navigationTitle("Neuer Moment")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Abbrechen") { dismiss() }
+                    Button("Abbrechen") {
+                        dismiss()
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showGrowthView) {
+                if let current = growthQueue.first {
+                    GrowthView(
+                        oldImage: current.oldImage,
+                        newImage: current.newImage,
+                        relationshipName: current.relationshipName,
+                        onFinished: {
+                            if !growthQueue.isEmpty {
+                                growthQueue.removeFirst()
+                            }
+                            if growthQueue.isEmpty {
+                                showGrowthView = false
+                                dismiss()
+
+                            } else {
+                                showGrowthView = false
+                                
+                                Task {
+                                    try? await Task.sleep(
+                                        for: .milliseconds(300)
+                                    )
+
+                                    showGrowthView = true
+                                }
+                            }
+                        }
+                    )
+                    .id(current.id)
                 }
             }
         }
     }
-    
+
+    // MARK: - Save
     private func save() {
-        if viewModel.saveMoment() {
+
+        guard let results = viewModel.saveMoment() else {
+            return
+        }
+        let grown = results.filter {
+            $0.newStage > $0.oldStage
+        }
+        guard !grown.isEmpty else {
             dismiss()
+            return
+        }
+
+        growthQueue = grown.compactMap { result in
+            let images = viewModel.growthImages(
+                plantName: result.plantName,
+                oldStage: result.oldStage,
+                newStage: result.newStage
+            )
+            guard let oldImage = images.0,
+                  let newImage = images.1
+            else { return nil }
+
+            return GrowthItem(
+                oldImage: oldImage,
+                newImage: newImage,
+                relationshipName: result.relationshipName
+            )
+        }
+
+        if growthQueue.isEmpty {
+            dismiss()
+        } else {
+            showGrowthView = true
         }
     }
 }
 
-/*#Preview {
-    let rel = Relationship(
-        name: "Anna",
-        plant: Plant(type: "pansy"),
+#Preview {
+    let relationship = Relationship(
+        name: "Anna Haro",
+        phoneNumber: "0170123456",
+        birthDate: .now,
+        plant: Plant(type: "cosmos"),
         careRhythm: CareRhythm(interval: 7)
     )
-    MomentView(viewModel: MomentViewModel(relationship: rel))
-}*/
+    let vm = MomentViewModel(
+        relationship: relationship
+    )
+    vm.notes = "Wir waren heute zusammen spazieren."
+    return MomentView(
+        viewModel: vm
+    )
+}

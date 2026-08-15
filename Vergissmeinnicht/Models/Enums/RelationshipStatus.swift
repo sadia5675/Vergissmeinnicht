@@ -8,55 +8,51 @@
 import SwiftUI
 import Foundation
 
+/// Der aktuelle Pflegezustand der Beziehung, ergibt sich aus dem Pflegeintervall und den vergangenen Tagen seit dem letzten Kontakt
 enum RelationshipStatus {
-
+    
+    /// Die Beziehung wird aktiv gepflegt
     case blooming
+    
+    /// Das Pflegeintervall wurde überschritten
     case needsCare
+    
+    /// Das doppelte Pflegeintervall wurde überschritten
     case missesYou
 
     var displayText: String {
-
         switch self {
-
         case .blooming:
-            return "Blüht"
-
+            return TextService.shared.texts.status.blooming
         case .needsCare:
-            return "Braucht Pflege"
-
+            return TextService.shared.texts.status.needsCare
         case .missesYou:
-            return "Vermisst dich"
+            return TextService.shared.texts.status.missesYou
         }
-        
     }
     
-    var color: Color {
-
+    /// Hintergrundfarbe des Status-Chips
+    var chipBackground: Color {
         switch self {
-
-           case .blooming:
-               return .green
-
-           case .needsCare:
-               return .orange
-
-           case .missesYou:
-               return .gray
-           }
-       }
-    
-    var backgroundColor: Color {
-
-        switch self {
-
         case .blooming:
-            return .green.opacity(0.2)
-
+            return Color("Secondary")
         case .needsCare:
-            return .orange.opacity(0.2)
-
+            return Color("Background")
         case .missesYou:
-            return .gray.opacity(0.2)
+            return Color("Surface")
+        }
+    }
+
+    /// Textfarbe des Status-Chips
+    var chipForeground: Color {
+        switch self {
+        case .blooming:
+            return Color("PrimaryDark")
+        case .needsCare:
+            return Color("Primary")
+        case .missesYou:
+            return .gray
         }
     }
 }
+

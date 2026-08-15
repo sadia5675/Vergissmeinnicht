@@ -7,65 +7,84 @@
 
 import SwiftUI
 
+/// Formular zum Erstellen, Bearbeiten oder Löschen einer benutzerdefinierten Erinnerung
 struct CustomReminderView: View {
+
+    // MARK: - Properties
+
     @StateObject var viewModel: CustomReminderViewModel
-    @Environment(\.dismiss) var dismiss
-    
+
+    @Environment(\.dismiss) private var dismiss
+
+    // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Erinnerungstitel") {
-                    TextField("z.B. 'Omas Geburtstag'", text: $viewModel.label)
+
+            VStack(alignment: .leading, spacing: 28) {
+                Text("Neue Erinnerung")
+                    .font(.title.bold())
+                    .foregroundStyle(Color("PrimaryDark"))
+
+                Text("""
+                Füge einen besonderen Termin hinzu,
+                damit du ihn nicht vergisst.
+                """)
+                .foregroundStyle(Color("Primary"))
+
+                BorderedTextField(
+                    placeholder: "Erinnerungstitel...",
+                    text: $viewModel.label
+                )
+
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
                 
-                Section("Wann erinnern?") {
-                    DatePicker(
-                        "Datum und Zeit",
-                        selection: $viewModel.date,
-                        displayedComponents: [.date, .hourAndMinute]
-                    )
-                }
+                DateTimeCard(date: $viewModel.date, showTime: true)
                 
-                if viewModel.isEditing {
-                    Section("Status") {
-                        Toggle("Aktiviert", isOn: $viewModel.isActive)
-                    }
-                }
-                
-                Section {
-                    Button(action: {
-                        viewModel.save()
+                Spacer()
+
+                SecondaryButton(
+                    title: viewModel.isEditing
+                        ? "Speichern"
+                        : "Erinnerung hinzufügen",
+                    selected: true
+                ) {
+                    if viewModel.saveCustomReminder() {
                         dismiss()
-                    }) {
-                        if viewModel.isLoading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            Text(viewModel.isEditing ? "Speichern" : "Erinnerung hinzufügen")
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(.white)
-                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.label.isEmpty || viewModel.isLoading)
                 }
-                
-                // Löschen Button (nur im Edit-Mode)
-                if viewModel.isEditing {
-                    Section {
-                        Button(action: {
-                            viewModel.delete()
-                            dismiss()
-                        }) {
-                            Text("Erinnerung löschen")
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(.red)
-                        }
+                .disabled(viewModel.isLoading)
+
+                if viewModel.isEditing && viewModel.canDelete {
+                    SecondaryButton(
+                        title: "Erinnerung löschen",
+                        selected: false
+                    ) {
+                        viewModel.delete()
+                        dismiss()
                     }
                 }
             }
-            .navigationTitle(viewModel.isEditing ? "Erinnerung bearbeiten" : "Neue Erinnerung")
+            .padding()
+            .background(Color("Background"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Abbrechen") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
+}
+
+#Preview {
+    CustomReminderView(
+        viewModel: CustomReminderViewModel()
+    )
 }

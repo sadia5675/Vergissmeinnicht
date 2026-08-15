@@ -8,44 +8,60 @@
 import Combine
 import Foundation
 
+/// ViewModel für die Anzeige situationsabhängiger Hinweise in der Gartenübersicht und der Detailansicht
 @MainActor
 class HintViewModel: ObservableObject {
+
+    // MARK: - Published Properties
+
     @Published var hints: [Hint] = []
     @Published var detailHint: Hint?
-    @Published var lastHintDismissedDate: Date?
-    
+
+    // MARK: - Dependencies
+
     private let hintService = HintService.shared
-    
+    private let dismissalStore = HintDismissalStore.shared
+
+    // MARK: - Loading
+
+    /// Lädt Hinweise für die Gartenübersicht
+    /// Wurde der Hinweis heute bereits weggewischt, wird keiner angezeigt
     func loadHints(for relationships: [Relationship]) {
-        // Prüfe ob HEUTE schon einen dismissed
-        let today = Calendar.current.startOfDay(for: Date())
-        let lastDismissedDay = lastHintDismissedDate.map { Calendar.current.startOfDay(for: $0) }
-        
-        if lastDismissedDay == today {
-            print("Heute schon einen Hint dismissed - keine neuen!")
-            hints = []
+        let eligibleRelationships = relationships.filter {
+            !dismissalStore.isDismissedToday($0.id)
+        }
+        hints = hintService.generateHintsForGarden(for: eligibleRelationships)
+    }
+
+    /// Lädt den Hinweis für eine einzelne Beziehung in der Detailansicht
+    /// Wurde der Hinweis heute bereits weggewischt, wird keiner angezeigt
+    func loadHint(for relationship: Relationship) {
+        if dismissalStore.isDismissedToday(relationship.id) {
+            detailHint = nil
             return
         }
-        
-        print("Neuer Tag! Lade neue Hints...")
-        let allHints = hintService.generateHintsForGarden(for: relationships)
-        hints = allHints
+        detailHint = hintService
+            .generateHintsForDetail(for: relationship) // gibt Array zurück
+            .first
     }
-    
-    func loadHint(
-        for relationship: Relationship
-    ) {
-        detailHint =
-            hintService
-                .generateHintsForDetail(
-                    for: relationship
-                )
-                .first
-    }
-    
+
+    // MARK: - Dismiss Actions
+
+    /// Entfernt einen Hinweis aus der Gartenübersicht und merkt das Wegwischen dauerhaft für den Rest des Tages
     func dismissHint(_ id: UUID) {
+        if let hint = hints.first(where: { $0.id == id }) {
+            dismissalStore.dismiss(hint.relationship.id)
+        }
         hints.removeAll { $0.id == id }
-        lastHintDismissedDate = Date()  // Merke HEUTE!
+
+        if detailHint?.id == id {
+            detailHint = nil
+        }
     }
-    
+
+    /// Entfernt den Hinweis in der Detailansicht und merkt das Wegwischen dauerhaft für den Rest des Tages
+    func dismissDetailHint(for relationship: Relationship) {
+        detailHint = nil
+        dismissalStore.dismiss(relationship.id)
+    }
 }

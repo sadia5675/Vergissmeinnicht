@@ -7,116 +7,107 @@
 
 import SwiftUI
 
+/// Einzelner Eintrag der Momente-Timeline mit Zeitstrahl-Verbindungslinie, Foto, Notiz und beteiligten Personen
 struct TimelineCard: View {
+
+    // MARK: - Properties
+
     let moment: Moment
     let isLast: Bool
     let photo: UIImage?
     let participants: [Relationship]
 
+    // MARK: - Body
+
     var body: some View {
 
         HStack(alignment: .top, spacing: 16) {
 
-            // MARK: Timeline links
+            // MARK: - Timeline
 
             VStack(spacing: 0) {
-
+                
                 ZStack {
                     Circle()
-                        .fill(Color.green)
-                        .frame(width: 60, height: 60)
+                        .fill(Color("Primary"))
+                        .frame(width: 46, height: 46)
 
-                    Image(systemName: moment.type.sfSymbol)
-                        .font(.title2)
-                        .foregroundColor(.white)
+                    Image(systemName: moment.interactionType.sfSymbol)
+                        .font(.headline)
+                        .foregroundStyle(.white)
                 }
 
                 if !isLast {
                     Rectangle()
-                        .fill(Color.green)
-                        .frame(width: 3)
+                        .fill(Color("Primary"))
+                        .frame(width: 2)
                         .frame(maxHeight: .infinity)
                 }
             }
 
-            // MARK: Inhalt rechts
+            // MARK: - Content
 
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
-
-                Text(moment.type.name)
-                    .font(.title3)
-                    .fontWeight(.bold)
+            VStack(alignment: .leading, spacing: 12) {
+                Text(moment.interactionType.name)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(Color("PrimaryDark"))
+                Text(
+                    DateTextFormatter.formatMomentDate(
+                        moment.date
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(Color("Primary"))
 
                 if let notes = moment.notes,
                    !notes.isEmpty {
-
                     Text(notes)
-                        .font(.body)
-                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .foregroundStyle(Color("PrimaryDark"))
                 }
-                if !participants.isEmpty {
 
-                    ScrollView(.horizontal, showsIndicators: false) {
+                if let image = photo {
+                    ZoomableImage(image: image, cornerRadius: 18, height: 135)
+                }
 
-                        HStack {
+                if participants.count > 1 {
+                    ScrollView(
+                        .horizontal,
+                        showsIndicators: false
+                    ) {
 
+                        HStack(spacing: 8) {
                             ForEach(participants) { participant in
-
                                 Text(participant.name)
-                                    .font(.caption)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(Color("PrimaryDark"))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
-                                    .background(
-                                        Color.green.opacity(0.15)
-                                    )
-                                    .cornerRadius(12)
+                                    .background(Color("Secondary"))
+                                    .clipShape(Capsule())
                             }
                         }
                     }
                 }
-
-                if let image = photo {
-
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 180)
-                        .clipped()
-                        .cornerRadius(12)
-                }
-
-                Text(relativeDate)
-                    .font(.caption)
-                    .foregroundColor(.gray)
             }
+            .padding(14)
             .frame(
                 maxWidth: .infinity,
                 alignment: .leading
             )
+            .background(Color("Surface"))
+            .overlay {
+
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(
+                        Color("Border"),
+                        lineWidth: 1
+                    )
+            }
+            .clipShape(
+                RoundedRectangle(cornerRadius: 18)
+            )
         }
-        .padding(.vertical, 12)
-    }
-
-    private var relativeDate: String {
-
-        let days =
-            Calendar.current.dateComponents(
-                [.day],
-                from: moment.date,
-                to: Date()
-            ).day ?? 0
-
-        if days == 0 {
-            return "Heute"
-        }
-
-        if days == 1 {
-            return "Gestern"
-        }
-
-        return "vor \(days) Tagen"
+        .padding(.vertical, 10)
     }
 }

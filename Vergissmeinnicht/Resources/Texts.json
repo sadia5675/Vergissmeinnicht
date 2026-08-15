@@ -1,0 +1,62 @@
+{
+"hints": {
+
+    "motivational": [
+        "@NAME blüht gerade auf.",
+        "Manche Beziehungen wachsen leise im Hintergrund.",
+        "Ein kleiner Moment kann viel bedeuten.",
+        "Jede Beziehung erzählt ihre eigene Geschichte.",
+        "@NAME ist ein schöner Teil deines Gartens."
+    ],
+
+    "gentleReminder": [
+        {
+          "display": "@NAME freut sich sicher über ein Lebenszeichen.",
+          "prefilled": "Hey @NAME!"
+        },
+        {
+          "display": "Ein kurzer Gruß an @NAME? Jetzt ist ein guter Moment dafür.",
+          "prefilled": "Wie geht's dir, @NAME?"
+        },
+        {
+          "display": "Melde dich bei @NAME – ein Moment danach lässt sich gleich festhalten.",
+          "prefilled": "Hey @NAME, ich wollte mich mal melden."
+        },
+        {
+          "display": "Vielleicht passt diesmal ein persönliches Treffen mit @NAME.",
+          "prefilled": "Hey @NAME, hast du Lust, uns mal wieder zu treffen?"
+        }
+    ],
+
+    "missingYou": [
+        "Erinnerst du dich an diesen Moment? @MOMENT",
+        "Damals hast du notiert: @MOMENT",
+        "Heute vor @DAYS Tagen entstand dieser Moment: @MOMENT",
+        "Ein Blick zurück: @MOMENT – vielleicht ein guter Anlass, dich zu melden."
+    ]
+},
+
+"notifications": {
+    "intervalTitle": "Erinnerungsrhythmus für @NAME?",
+    "intervalBody": [
+        "Jede kleine Geste lässt eure Verbindung weiter wachsen.",
+        "Manchmal reicht ein kleiner Moment, um Nähe wachsen zu lassen.",
+        "Vielleicht ist heute ein schöner Moment für ein kleines Zeichen."
+    ],
+    "birthdayTitle": "Geburtstag",
+    "birthdayBody": "Heute hat @NAME Geburtstag.",
+    "customBody": "Erinnerung zu @NAME"
+},
+
+  "status": {
+
+    "blooming":
+      "Blüht",
+
+    "needsCare":
+      "Braucht Pflege",
+
+    "missesYou":
+      "Vermisst dich"
+  }
+}
